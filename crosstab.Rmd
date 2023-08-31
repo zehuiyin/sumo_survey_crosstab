@@ -1,0 +1,205 @@
+---
+title: "Crosstab on health, well-being, and social capital outcome"
+author: "Zehui Yin"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(summarytools) # for crosstab
+library(reshape2) # for long to wide
+```
+
+```{r read data, include=FALSE}
+# survey dataset
+df <- read_csv("./Data/sumo_fullsample.csv")
+
+# sufficiency scores
+suff1 <- read_csv("./Data/survey_sufficiency_score.csv")
+suff2 <- read_csv("./Data/4_missing_sufficiency_score.csv")
+suff <- rbind(suff1, suff2)
+
+df <- merge(df,
+            suff,
+            by = "ID")
+
+rm(suff, suff1, suff2)
+```
+
+```{r}
+# disaggregated by neighborhood completeness score and by sociodemographic characteristics
+crosstab_by <- c("suff_w_total_class",
+                 "suff_t_total_class",
+                 "score_w_total_class",
+                 "score_t_total_class",
+                 "Q9.2_gender",
+                 "Q9.4_RacialCategory",
+                 "Q9.10_1_hhincome_class",
+                 "Q9.8_move_to_can",
+                 "Q9.9_move_to_scarb")
+
+# recode
+df$Q9.10_1_hhincome_class <- 
+  case_when(
+  df$Q9.10_1_hhincome <= 20 ~ "1:<20k",
+  df$Q9.10_1_hhincome > 20 & df$Q9.10_1_hhincome <= 40 ~ "2:<40k",
+  df$Q9.10_1_hhincome > 40 & df$Q9.10_1_hhincome <= 60 ~ "3:<60k",
+  df$Q9.10_1_hhincome > 60 & df$Q9.10_1_hhincome <= 80 ~ "4:<80k",
+  df$Q9.10_1_hhincome > 80 & df$Q9.10_1_hhincome <= 100 ~ "5:<100k",
+  df$Q9.10_1_hhincome > 100 & df$Q9.10_1_hhincome <= 120 ~ "6:<120k",
+  df$Q9.10_1_hhincome > 120 & df$Q9.10_1_hhincome <= 140 ~ "7:<140k",
+  df$Q9.10_1_hhincome > 140 ~ "8:>140k"
+  )
+
+df$suff_w_total_class <- 
+  case_when(
+  df$suff_w_total <= quantile(df$suff_w_total)[[2]] ~ "<25%",
+  df$suff_w_total > quantile(df$suff_w_total)[[2]] & df$suff_w_total <= quantile(df$suff_w_total)[[3]] ~ "<50%",
+  df$suff_w_total > quantile(df$suff_w_total)[[3]] & df$suff_w_total <= quantile(df$suff_w_total)[[4]] ~ "<75%",
+  df$suff_w_total > quantile(df$suff_w_total)[[4]] ~ ">75%",
+  )
+
+df$suff_t_total_class <- 
+  case_when(
+  df$suff_t_total <= quantile(df$suff_t_total)[[2]] ~ "<25%",
+  df$suff_t_total > quantile(df$suff_t_total)[[2]] & df$suff_t_total <= quantile(df$suff_t_total)[[3]] ~ "<50%",
+  df$suff_t_total > quantile(df$suff_t_total)[[3]] & df$suff_t_total <= quantile(df$suff_t_total)[[4]] ~ "<75%",
+  df$suff_t_total > quantile(df$suff_t_total)[[4]] ~ ">75%",
+  )
+
+df$score_w_total_class <- 
+  case_when(
+  df$score_w_total <= quantile(df$score_w_total)[[2]] ~ "<25%",
+  df$score_w_total > quantile(df$score_w_total)[[2]] & df$score_w_total <= quantile(df$score_w_total)[[3]] ~ "<50%",
+  df$score_w_total > quantile(df$score_w_total)[[3]] & df$score_w_total <= quantile(df$score_w_total)[[4]] ~ "<75%",
+  df$score_w_total > quantile(df$score_w_total)[[4]] ~ ">75%",
+  )
+
+df$score_t_total_class <- 
+  case_when(
+  df$score_t_total <= quantile(df$score_t_total)[[2]] ~ "<25%",
+  df$score_t_total > quantile(df$score_t_total)[[2]] & df$score_t_total <= quantile(df$score_t_total)[[3]] ~ "<50%",
+  df$score_t_total > quantile(df$score_t_total)[[3]] & df$score_t_total <= quantile(df$score_t_total)[[4]] ~ "<75%",
+  df$score_t_total > quantile(df$score_t_total)[[4]] ~ ">75%",
+  )
+
+cross_tab <- function(col) {
+  tab_toward <- crosstab_by
+  label <- c("Walk Sufficiency", 
+             "Transit Sufficiency",
+             "Walk Complete Score",
+             "Transit Complete Score",
+             "Gender",
+             "Race",
+             "Household Income",
+             "When moved to Canada",
+             "When moved to Scarborough")
+  
+  # print variable name
+  cat("<p style='text-align: center;font-size: 150%; color: #43a2ca'>",
+      "<b>",
+      "Variable: ", 
+      substr(deparse(substitute(col)), 4, str_width(deparse(substitute(col)))),
+      "</b></p>"
+      )
+  
+  # print cross-tab
+  col <- col |>
+    as.factor()
+  for (i in 1:9) {
+      ctable(col, 
+             df[, tab_toward[i]] |>
+               as.factor(),
+           dnn = c("Variable", label[i])
+           ) |>
+      # render tables
+      print(x=_,
+            method = 'render') |>
+      # print inside loop
+      print()
+      # hard line break
+      cat('\n\n<!-- -->\n\n')
+  }
+}
+
+# render for rmarkdown
+st_options(style = "rmarkdown",
+           headings = F,
+           footnote = NA)
+```
+
+```{r include=F}
+####################################################################
+### Here is a function for saving crosstab to a dataframe/tibble ###
+####################################################################
+cross_tab_to_df <- function(df, var1, var2, count=T) {
+  crosstab_list <-
+    ctable(
+    # variable 1
+    df[,var1] |>
+           as.factor(), 
+    # variable 2
+    df[,var2] |>
+           as.factor()
+         )
+  
+  if (count==T) {
+    # crosstab counts to df/tibble
+    out <- crosstab_list$cross_table |>
+      as.tibble() |>
+      # long to wide
+      dcast(data=_, 
+            formula = formula(paste0("`as.factor(df[, var1])`",
+                                     "~", "`as.factor(df[, var2])`")),
+        value.var="n")
+  } else {
+    # crosstab proportion to df/tibble
+    out <- crosstab_list$proportions |>
+      as.data.frame() |>
+      # preserve row names
+      rownames_to_column("Var")
+  }
+  
+  return(out)
+}
+
+# exmaple of usage
+cross_tab_to_df(df, "Q3.4_1_overallhealth", "suff_w_total_class")
+# when wanting proportions instead of counts
+cross_tab_to_df(df, "Q3.4_1_overallhealth", "suff_w_total_class", count=F)
+```
+
+# Health
+
+```{r, results='asis'}
+# generate the css
+st_css()
+
+cross_tab(df$Q3.4_1_overallhealth)
+cross_tab(df$Q3.4_2_physicalhealth)
+cross_tab(df$Q3.4_3_mentalhealth)
+```
+
+# Well-being
+
+```{r, results='asis'}
+cross_tab(df$Q3.6_1_life_satisf)
+cross_tab(df$Q3.6_2_health_satisf)
+cross_tab(df$Q3.6_3_work_satisf)
+cross_tab(df$Q3.6_4_personaltime_satisf)
+cross_tab(df$Q3.6_5_finance_satisf)
+```
+
+# Social capital
+
+```{r, results='asis'}
+cross_tab(df$Q3.7_1_trustppl_gen)
+cross_tab(df$Q3.7_2_trustppl_family)
+cross_tab(df$Q3.7_3_trustppl_nb)
+cross_tab(df$Q3.7_4_trustppl_work)
+cross_tab(df$Q3.7_5_trustppl_school)
+cross_tab(df$Q3.7_6_trustppl_difflang)
+cross_tab(df$Q3.7_7_trustppl_diffreligion)
+cross_tab(df$Q3.7_8_trustppl_diffethnic)
+```
