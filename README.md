@@ -1,6 +1,6 @@
 # SuMo Survey Crosstab
 
-Crosstabing source code for [Suburban Mobility Cluster (SuMo)](https://www.utsc.utoronto.ca/suburban-mobilities/) Survey.
+Crosstabing source code written in R markdown for [Suburban Mobility Cluster (SuMo)](https://www.utsc.utoronto.ca/suburban-mobilities/) Survey. Please note that the survey data are **not** provided here.
 
 ## Dependent variables: 
 - Overall health, physical health, mental health,
